@@ -1,0 +1,6 @@
+# Torch CPU — à installer AVANT requirements.txt :
+#   pip install -r requirements-cpu.txt
+#   pip install --no-deps -r requirements.txt
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0
+torchaudio==2.6.0

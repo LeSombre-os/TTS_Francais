@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTS Français local</title>
+<style>
+:root { color-scheme: dark; --bg:#14161a; --card:#1e2228; --acc:#4da3ff; --txt:#e8eaf0; --mut:#9aa3b2; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.5 system-ui,sans-serif; }
+main { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+h1 { font-size:1.4rem; margin:0 0 4px; }
+p.sub { color:var(--mut); margin:0 0 20px; font-size:.9rem; }
+.card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:16px; }
+textarea { width:100%; min-height:140px; resize:vertical; background:#0f1114; color:var(--txt);
+  border:1px solid #333a44; border-radius:8px; padding:10px; font-size:1rem; }
+.counter { text-align:right; color:var(--mut); font-size:.8rem; }
+.row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+.field { flex:1 1 200px; display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:var(--mut); }
+select, input[type=file] { background:#0f1114; color:var(--txt); border:1px solid #333a44; border-radius:8px; padding:8px; }
+input[type=range] { width:100%; accent-color:var(--acc); }
+.val { color:var(--txt); }
+button { background:var(--acc); color:#06121f; border:0; border-radius:10px; padding:12px 24px;
+  font-size:1rem; font-weight:700; cursor:pointer; width:100%; }
+button:disabled { opacity:.5; cursor:wait; }
+#status { color:var(--mut); font-size:.9rem; min-height:1.4em; margin-top:8px; }
+audio { width:100%; margin-top:8px; }
+.hist a { display:block; color:var(--acc); font-size:.85rem; margin-top:6px; }
+label.speed { display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--mut); margin-top:8px; }
+</style>
+</head>
+<body>
+<main>
+<h1>🔊 TTS Français — 100&nbsp;% local</h1>
+<p class="sub" id="backend">Moteur : Chatterbox FR · connexion…</p>
+
+<div class="card">
+<textarea id="text" maxlength="2000" placeholder="Écris ton texte en français ici…">Bonjour ! Ceci est une synthèse vocale locale, réaliste et entièrement hors-ligne. Les liaisons, les accents et la ponctuation sont pris en charge.</textarea>
+<div class="counter"><span id="count">0</span>/2000</div>
+</div>
+
+<div class="card">
+<div class="row">
+<div class="field">Modèle
+<select id="model">
+<option value="fr">Français premium (recommandé)</option>
+<option value="multi">Multilingue (repli)</option>
+</select></div>
+<div class="field">Voix fixe
+<select id="voice"><option value="default">Voix par défaut</option></select></div>
+<div class="field">Clonage (optionnel, wav 5-10&nbsp;s)
+<input type="file" id="ref" accept="audio/*"></div>
+</div>
+<div class="row">
+<div class="field">Expressivité <span class="val" id="v-ex">0.50</span>
+<input type="range" id="ex" min="0" max="1" step="0.05" value="0.5"></div>
+<div class="field">Stabilité (CFG) <span class="val" id="v-cfg">0.50</span>
+<input type="range" id="cfg" min="0" max="1" step="0.05" value="0.5"></div>
+<div class="field">Variabilité <span class="val" id="v-tp">0.80</span>
+<input type="range" id="tp" min="0.1" max="1.5" step="0.05" value="0.8"></div>
+</div>
+</div>
+
+<div class="card">
+<button id="go">Générer ▶</button>
+<div id="status"></div>
+<audio id="player" controls hidden></audio>
+<label class="speed">Vitesse de lecture
+<input type="range" id="rate" min="0.5" max="1.5" step="0.05" value="1" style="flex:1">
+<span class="val" id="v-rate">1.00×</span></label>
+<div style="margin-top:8px"><a id="dl" hidden download="tts.wav" style="color:var(--acc)">⬇ Télécharger le WAV</a></div>
+</div>
+
+<div class="card hist"><b>Historique (session)</b><div id="hist"></div></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const text=$('text'), go=$('go'), status=$('status'), player=$('player'), dl=$('dl');
+text.addEventListener('input', () => $('count').textContent = text.value.length);
+$('count').textContent = text.value.length;
+[['ex','v-ex',2],['cfg','v-cfg',2],['tp','v-tp',2]].forEach(([a,b,d]) =>
+  $(a).addEventListener('input', e => $(b).textContent = (+e.target.value).toFixed(d)));
+$('rate').addEventListener('input', e => { player.playbackRate = +e.target.value;
+  $('v-rate').textContent = (+e.target.value).toFixed(2)+'×'; });
+
+fetch('api/status').then(r=>r.json()).then(s =>
+  $('backend').textContent = `Moteur : Chatterbox FR · ${s.device.toUpperCase()} · modèles chargés : ${s.loaded.join(', ')||'au 1er usage'}`).catch(()=>{});
+fetch('api/voices').then(r=>r.json()).then(v =>
+  v.forEach(n => { const o=document.createElement('option'); o.value=n; o.textContent=n; $('voice').appendChild(o); })).catch(()=>{});
+
+go.addEventListener('click', async () => {
+  if (!text.value.trim()) { status.textContent = 'Écris d’abord un texte.'; return; }
+  go.disabled = true; status.textContent = 'Génération en cours… (10-60 s sur CPU)';
+  const fd = new FormData();
+  fd.append('text', text.value); fd.append('model', $('model').value);
+  fd.append('voice', $('voice').value); fd.append('exaggeration', $('ex').value);
+  fd.append('cfg', $('cfg').value); fd.append('temperature', $('tp').value);
+  if ($('ref').files[0]) fd.append('ref', $('ref').files[0]);
+  try {
+    const r = await fetch('api/tts', { method:'POST', body:fd });
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const blob = await r.blob(), url = URL.createObjectURL(blob);
+    player.src = url; player.hidden = false; player.playbackRate = +$('rate').value; player.play();
+    dl.href = url; dl.hidden = false;
+    const a = document.createElement('a'); a.href = url;
+    a.textContent = `⬇ ${text.value.slice(0,50)}…`; a.download = 'tts.wav';
+    $('hist').prepend(a);
+    status.textContent = 'Terminé ✓';
+  } catch(e) { status.textContent = 'Erreur : ' + e.message; }
+  go.disabled = false;
+});
+</script>
+</body>
+</html>

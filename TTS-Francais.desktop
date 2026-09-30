@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=▶ TTS Français
+Comment=Lance l'app locale (terminal + navigateur). Premier usage : clic droit → Autoriser le lancement. Nom sans espaces/accents pour compatibilité.
+Exec=bash -c "cd \\$(dirname %k) && gnome-terminal -- ./lancer.sh"
+Icon=audio-x-generic
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupNotify=false

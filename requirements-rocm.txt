@@ -1,0 +1,8 @@
+# Torch ROCm (GPU AMD) — à installer AVANT requirements.txt :
+#   pip install -r requirements-rocm.txt
+#   pip install --no-deps -r requirements.txt
+# RX 6600/6600 XT = gfx1032. Autre carte : remplace par ton arch
+# (device-gfx1030, device-gfx1100, device-gfx1101…).
+--index-url https://rocm.nightlies.amd.com/whl-multi-arch/
+torch[device-gfx1032]
+torchaudio
